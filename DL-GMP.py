@@ -5,7 +5,6 @@ from bs4 import BeautifulSoup
 import re
 from tqdm import tqdm
 from urllib.parse import urljoin, urlparse
-from weasyprint import HTML  # For rendering HTML as PDF
 
 # Set environment variable for XDG_RUNTIME_DIR
 os.environ["XDG_RUNTIME_DIR"] = "/tmp/runtime-vscode"
@@ -42,16 +41,27 @@ def download_file(url, save_path):
         print(f"Failed to download {url}")
         files_failed += 1
 
-# Function to render and save the base URL HTML as a PDF
+# Function to render and save the base URL HTML as a PDF using localhost:5000/pdf
 def render_html_as_pdf(base_url, output_dir, file_name="base_url_rendered.pdf"):
     global urls_rendered
     try:
         response = requests.get(base_url, headers=headers)
         if response.status_code == 200:
-            html_save_path = os.path.join(output_dir, file_name)
-            HTML(string=response.text).write_pdf(html_save_path)
-            urls_rendered += 1  # Increment the rendered URLs counter
-            print(f"HTML rendered and saved as PDF: {html_save_path}")
+            # Post the HTML content to localhost:5000/pdf
+            pdf_response = requests.post(
+                "http://localhost:5001/pdf?myfilename=base_url_rendered.pdf",
+                data=response.text.encode("utf-8"),
+                headers={"Content-Type": "text/html"}
+            )
+            if pdf_response.status_code == 200:
+                # Save the resulting PDF file
+                pdf_save_path = os.path.join(output_dir, file_name)
+                with open(pdf_save_path, "wb") as pdf_file:
+                    pdf_file.write(pdf_response.content)
+                urls_rendered += 1  # Increment the rendered URLs counter
+                print(f"HTML rendered and saved as PDF: {pdf_save_path}")
+            else:
+                print(f"Failed to render PDF for {base_url}: {pdf_response.status_code}")
         else:
             print(f"Failed to fetch the URL for rendering: {base_url}")
     except Exception as e:
